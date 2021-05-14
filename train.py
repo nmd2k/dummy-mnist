@@ -1,4 +1,3 @@
-from platform import architecture
 import wandb
 from utils.model import Net
 from utils.utils import get_dataloader, get_dataset, get_transform
