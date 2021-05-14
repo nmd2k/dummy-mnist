@@ -30,10 +30,12 @@ def train(model, epoch, trainloader, optimizer, loss_function):
     total_loss = running_loss/len(trainloader.dataset)
     wandb.log({'epoch':epoch, 'train loss':total_loss})
     
-    # wandb save
+    # wandb save as artifact
     torch.onnx.export(model, input, RUN_NAME+'.onnx')
     wandb.save(RUN_NAME+'.onnx')
-
+    trained_weight = wandb.Artifact("CNN", type="model", description="test")
+    trained_weight.add_file(RUN_NAME+'.onnx')
+    run.log_artifact(trained_weight)
     # pytorch save
     # torch.save(model.state_dict(), SAVE_PATH+'.pth')
     return 
@@ -63,7 +65,8 @@ if __name__ == '__main__':
         dataset       = DATASET
     )
 
-    wandb.init(project="wandb-demo", tags=["dropout", "cnn"], config=config)
+    run = wandb.init(project="mlops-wandb-demo", tags=["dropout", "cnn"], config=config)
+    run.use_artifact('mnist:latest')
     
     # get dataloader
     train_set, test_set = get_dataset(transform=get_transform())
@@ -82,7 +85,7 @@ if __name__ == '__main__':
     train_losses, test_losses, test_accuracy = [], [], []
 
     # wandb watch model
-    wandb.watch(models=model, criterion=loss_function, optimizer=optimizer, log='all', log_freq=10)
+    wandb.watch(models=model, criterion=loss_function, log='all', log_freq=10)
 
     for epoch in pb:
         train_loss = train(model, epoch, trainloader, optimizer, loss_function)
@@ -92,7 +95,7 @@ if __name__ == '__main__':
         test_losses.append(test_loss)
         test_accuracy.append(test_acc)
 
-        pb.set_description(f'Train loss: {train_loss:.2f} | Valid loss: {test_loss:.2f} | Accuracy: {test_acc:.2f}%')
+        # pb.set_description(f'Train loss: {train_loss:.2f} | Valid loss: {test_loss:.2f} | Accuracy: {test_acc:.2f}%')
 
 
 
