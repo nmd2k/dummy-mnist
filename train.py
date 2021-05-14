@@ -1,4 +1,5 @@
-import re
+from platform import architecture
+import wandb
 from utils.model import Net
 from utils.utils import get_dataloader, get_dataset, get_transform
 
@@ -11,7 +12,7 @@ import torch.optim as optim
 
 from config import *
 
-def train(model, trainloader, optimizer, loss_function):
+def train(model, epoch, trainloader, optimizer, loss_function):
     model.train()
     running_loss = 0
     for i, (input, target) in enumerate(trainloader, 0):
@@ -27,10 +28,18 @@ def train(model, trainloader, optimizer, loss_function):
         # statistics
         running_loss += loss.item()
 
-    torch.save(model.state_dict(), SAVE_PATH+'.pth')
-    return running_loss/len(trainloader.dataset)
+    total_loss = running_loss/len(trainloader.dataset)
+    wandb.log({'epoch':epoch, 'train loss':total_loss})
+    
+    # wandb save
+    torch.onnx.export(model, input, RUN_NAME+'.onnx')
+    wandb.save(RUN_NAME+'.onnx')
 
-def test(model, testloader):
+    # pytorch save
+    # torch.save(model.state_dict(), SAVE_PATH+'.pth')
+    return 
+
+def test(model, epoch, testloader):
     model.eval()
     test_loss = 0
     correct   = 0
@@ -43,9 +52,20 @@ def test(model, testloader):
     
     test_loss /= len(testloader)
     test_accuracy = 100. * correct / len(testloader.dataset)
+    wandb.log({'epoch':epoch, 'test loss':test_loss, 'test accuracy': test_accuracy})
     return test_loss, test_accuracy
 
 if __name__ == '__main__':
+    # init wandb
+    config = dict(
+        learning_rate = LEARNING_RATE,
+        momentum      = MOMENTUM,
+        architecture  = ARCHITECTURE,
+        dataset       = DATASET
+    )
+
+    wandb.init(project="wandb-demo", tags=["dropout", "cnn"], config=config)
+    
     # get dataloader
     train_set, test_set = get_dataset(transform=get_transform())
     trainloader, testloader = get_dataloader(train_set=train_set, test_set=test_set)
@@ -62,13 +82,17 @@ if __name__ == '__main__':
     pb = tqdm(range(epochs))
     train_losses, test_losses, test_accuracy = [], [], []
 
+    # wandb watch model
+    wandb.watch(models=model, criterion=loss_function, optimizer=optimizer, log='all', log_freq=10)
+
     for epoch in pb:
-        train_loss = train(model, trainloader, optimizer, loss_function)
+        train_loss = train(model, epoch, trainloader, optimizer, loss_function)
         train_losses.append(train_loss)
 
-        test_loss, test_acc = test(model, testloader)
+        test_loss, test_acc = test(model, epoch, testloader)
         test_losses.append(test_loss)
         test_accuracy.append(test_acc)
+
         pb.set_description(f'Train loss: {train_loss:.2f} | Valid loss: {test_loss:.2f} | Accuracy: {test_acc:.2f}%')
 
 

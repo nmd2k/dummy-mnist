@@ -8,6 +8,8 @@ DROPOUT_RATE    = 0.1
 
 # task config
 RUN_NAME        = 'demov1'
+ARCHITECTURE    = 'CNN'
+DATASET         = 'MNIST'
 NUM_CLASSES     = 10
 LOG_INTERVAL    = 10
 CLASSES         = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
