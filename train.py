@@ -66,7 +66,10 @@ if __name__ == '__main__':
     )
 
     run = wandb.init(project="mlops-wandb-demo", tags=["dropout", "cnn"], config=config)
-    run.use_artifact('mnist:latest')
+    # run.use_artifact('mnist:latest')
+    artifact = wandb.Artifact('mnist', type='dataset')
+    artifact.add_dir(DATA_PATH)
+    run.log_artifact(artifact)
     
     # get dataloader
     train_set, test_set = get_dataset(transform=get_transform())
