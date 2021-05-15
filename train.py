@@ -95,7 +95,5 @@ if __name__ == '__main__':
         test_losses.append(test_loss)
         test_accuracy.append(test_acc)
 
-        # pb.set_description(f'Train loss: {train_loss:.2f} | Valid loss: {test_loss:.2f} | Accuracy: {test_acc:.2f}%')
-
 
 
