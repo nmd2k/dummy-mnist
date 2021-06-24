@@ -34,7 +34,7 @@ run = wandb.init(project="mlops-wandb-demo", tags=["dropout", "cnn"])
 Where: 
 - `wandb.init()`: Initialize a new run with specific name through`project=<name>`.
 
-###Multiple run from one script
+### Multiple run from one script
 If we run multiple time in our script, use `run = wandb.init(reinit=True)` to reinit new run and `run.finish()` to end the run.
 ```python
 import wandb
