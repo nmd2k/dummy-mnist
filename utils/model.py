@@ -1,10 +1,12 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from config import DROPOUT_RATE
 
 class Net(nn.Module):
-    def __init__(self):
+    def __init__(self, drop_rate=0.5):
         super(Net, self).__init__()
+        print('[INFO] Initializing model...')
+        self.drop_rate = drop_rate
+
         self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
         self.conv2_drop = nn.Dropout2d()
@@ -16,6 +18,6 @@ class Net(nn.Module):
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
         x = x.view(-1, 320)
         x = F.relu(self.fc1(x))
-        x = F.dropout(x, p=DROPOUT_RATE, training=self.training)
+        x = F.dropout(x, self.drop_rate)
         x = self.fc2(x)
         return F.log_softmax(x, dim=-1)

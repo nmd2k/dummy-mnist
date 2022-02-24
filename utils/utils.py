@@ -1,9 +1,7 @@
-from config import *
+from numpy import save
 import torch
 import torchvision
 import torchvision.transforms as transforms
-
-import wandb
 
 
 def get_transform():
@@ -13,13 +11,15 @@ def get_transform():
 
     return transform
 
-def get_dataset(transform, download=True):
-    train_set = torchvision.datasets.MNIST(root=DATA_PATH, train=True, download=download, transform=transform)
-    test_set  = torchvision.datasets.MNIST(root=DATA_PATH, train=False, download=download, transform=transform)
+
+def get_dataset(transform, download=True, save_path='./data'):
+    train_set = torchvision.datasets.MNIST(root=save_path, train=True, download=download, transform=transform)
+    test_set  = torchvision.datasets.MNIST(root=save_path, train=False, download=download, transform=transform)
     return train_set, test_set
 
-def get_dataloader(train_set, test_set):
-    trainloader = torch.utils.data.DataLoader(train_set, batch_size=BATCH_SIZE_TRAIN, shuffle=True)
-    testloader = torch.utils.data.DataLoader(test_set, batch_size=BATCH_SIZE_TEST, shuffle=False)
+
+def get_dataloader(train_set, test_set, batch_size):
+    trainloader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True)
+    testloader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
     return trainloader, testloader

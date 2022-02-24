@@ -1,102 +1,91 @@
-import wandb
+import argparse
+
 from utils.model import Net
 from utils.utils import get_dataloader, get_dataset, get_transform
 
 import torch
-import torch.nn.functional as F
-from tqdm import tqdm
-
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 
-from config import *
 
-def train(model, epoch, trainloader, optimizer, loss_function):
+def args_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--epoch', type=int, default=10)
+    parser.add_argument('--bs', type=int, default=64)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--momentum', type=float, default=0.9)
+    parser.add_argument('--dropout_rate', type=float, default=0.4)
+    parser.add_argument('--cuda', action='store_true', default=False)
+    return parser.parse_args()
+
+
+def train(model, epoch, trainloader, optimizer, loss_function, cuda=None):
     model.train()
     running_loss = 0
     for i, (input, target) in enumerate(trainloader, 0):
-        # zero the gradient
-        optimizer.zero_grad()
-
-        # forward + backpropagation + step
+        if cuda:
+            input, target = input.cuda(), target.cuda()
         predict = model(input)
         loss = loss_function(predict, target)
         loss.backward()
+
+        optimizer.zero_grad()
         optimizer.step()
 
-        # statistics
         running_loss += loss.item()
 
     total_loss = running_loss/len(trainloader.dataset)
-    wandb.log({'epoch':epoch, 'train loss':total_loss})
-    
-    # wandb save as artifact
-    torch.onnx.export(model, input, RUN_NAME+'.onnx')
-    wandb.save(RUN_NAME+'.onnx')
-    trained_weight = wandb.Artifact("CNN", type="model", description="test")
-    trained_weight.add_file(RUN_NAME+'.onnx')
-    run.log_artifact(trained_weight)
-    # pytorch save
-    # torch.save(model.state_dict(), SAVE_PATH+'.pth')
-    return 
+    print(f'Epoch {epoch+1} | Train: Loss=[{total_loss:.2f}]')
+    return total_loss
 
-def test(model, epoch, testloader):
+
+def test(model, epoch, testloader, loss_function, cuda=None):
     model.eval()
     test_loss = 0
-    correct   = 0
+    count_correct   = 0
     with torch.no_grad():
-        for idx, (data, target) in enumerate(testloader):
-            output = model(data)
-            test_loss += F.nll_loss(output, target, size_average=False).item()
-            predict = output.data.max(1, keepdim=True)[1]
-            correct += predict.eq(target.view_as(predict)).sum().item()
+        for idx, (input, target) in enumerate(testloader):
+            if cuda:
+                input, target = input.cuda(), target.cuda()
+            predict = model(input)
+            loss = loss_function(predict, target)
+            test_loss += loss.item()
+            # print(predict.shape, target.shape)
+
+            count_correct += torch.sum(torch.argmax(predict, dim=1) == target).item()
     
     test_loss /= len(testloader)
-    test_accuracy = 100. * correct / len(testloader.dataset)
-    wandb.log({'epoch':epoch, 'test loss':test_loss, 'test accuracy': test_accuracy})
+    test_accuracy = count_correct / len(testloader.dataset)
+    print(f'Epoch {epoch+1} | Test:  Loss=[{test_loss:.2f}]; Acc=[{test_accuracy:.2f}]')
     return test_loss, test_accuracy
 
+
 if __name__ == '__main__':
-    # init wandb
-    config = dict(
-        learning_rate = LEARNING_RATE,
-        momentum      = MOMENTUM,
-        architecture  = ARCHITECTURE,
-        dataset       = DATASET
-    )
+    opt = args_parser()
+    epochs, lr, momentum, dropout_rate, \
+    batch_size, device = opt.epoch, opt.lr, opt.momentum, \
+                         opt.dropout_rate, opt.bs, opt.cuda
+    if opt.cuda:
+        torch.cuda.set_device(0)
+        device = torch.device('cuda')
 
-    run = wandb.init(project="mlops-wandb-demo", tags=["dropout", "cnn"], config=config)
-    # run.use_artifact('mnist:latest')
-    artifact = wandb.Artifact('mnist', type='dataset')
-    artifact.add_dir(DATA_PATH)
-    run.log_artifact(artifact)
-    
-    # get dataloader
     train_set, test_set = get_dataset(transform=get_transform())
-    trainloader, testloader = get_dataloader(train_set=train_set, test_set=test_set)
+    trainloader, testloader = get_dataloader(train_set, test_set, batch_size)
 
-    # create model
-    model = Net()
-
-    # define optimizer and loss function
-    epochs = EPOCHS
+    # init model
+    model = Net(dropout_rate)
     loss_function = nn.CrossEntropyLoss(reduction='sum')
-    optimizer     = optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+    optimizer     = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
     # training
-    pb = tqdm(range(epochs))
+    print(f'[INFO] Training {model.__class__.__name__} {epochs} epochs...')
     train_losses, test_losses, test_accuracy = [], [], []
 
-    # wandb watch model
-    wandb.watch(models=model, criterion=loss_function, log='all', log_freq=10)
-
-    for epoch in pb:
-        train_loss = train(model, epoch, trainloader, optimizer, loss_function)
+    for epoch in range(epochs):
+        train_loss = train(model, epoch, trainloader, optimizer, loss_function, device)
         train_losses.append(train_loss)
 
-        test_loss, test_acc = test(model, epoch, testloader)
+        test_loss, test_acc = test(model, epoch, testloader, loss_function, device)
         test_losses.append(test_loss)
         test_accuracy.append(test_acc)
-
-
-
