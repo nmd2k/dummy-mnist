@@ -8,6 +8,10 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
+# MLFlow API
+import mlflow
+from mlflow import log_metric, log_param, log_artifact
+
 
 def args_parser():
     parser = argparse.ArgumentParser()
@@ -36,6 +40,7 @@ def train(model, epoch, trainloader, optimizer, loss_function, cuda=None):
         running_loss += loss.item()
 
     total_loss = running_loss/len(trainloader.dataset)
+    log_metric(key='train_loss', value=total_loss, step=epoch)
     print(f'Epoch {epoch+1} | Train: Loss=[{total_loss:.2f}]')
     return total_loss
 
@@ -57,6 +62,8 @@ def test(model, epoch, testloader, loss_function, cuda=None):
     
     test_loss /= len(testloader)
     test_accuracy = count_correct / len(testloader.dataset)
+    log_metric(key='test_loss', value=test_loss, step=epoch)
+    log_metric(key='test_accuracy', value=test_accuracy, step=epoch)
     print(f'Epoch {epoch+1} | Test:  Loss=[{test_loss:.2f}]; Acc=[{test_accuracy:.2f}]')
     return test_loss, test_accuracy
 
@@ -82,10 +89,11 @@ if __name__ == '__main__':
     print(f'[INFO] Training {model.__class__.__name__} {epochs} epochs...')
     train_losses, test_losses, test_accuracy = [], [], []
 
-    for epoch in range(epochs):
-        train_loss = train(model, epoch, trainloader, optimizer, loss_function, device)
-        train_losses.append(train_loss)
+    with mlflow.start_run():
+        for epoch in range(epochs):
+            train_loss = train(model, epoch, trainloader, optimizer, loss_function, device)
+            train_losses.append(train_loss)
 
-        test_loss, test_acc = test(model, epoch, testloader, loss_function, device)
-        test_losses.append(test_loss)
-        test_accuracy.append(test_acc)
+            test_loss, test_acc = test(model, epoch, testloader, loss_function, device)
+            test_losses.append(test_loss)
+            test_accuracy.append(test_acc)
